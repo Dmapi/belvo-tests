@@ -9,10 +9,18 @@ const fetcher = (url) => fetch(url).then((res) => res.json())
 const getAverage = arr => Math.round(arr.reduce( ( p, c ) => p + c, 0 ) / arr.length);
 const getUniqueValues = arr => [...new Set(arr)]
 
+const getComplianceCheckResult = (outcome) => {
+  const statements = {
+    'NEGATIVE': '❌ - Not complying to his tax obligations',
+    'NO_OBLIGATIONS': '✅ Has no obligations',
+    'POSITIVE': '✅ Complying to all tax obligations'
+  }
+  return statements[outcome]
+}
 
 export default function Home(props) {
    const [value, setValue] = useState("");
-  	const [data, setData] = useState({taxStatus: null, taxComplianceStatus: null, invoices: [], taxReturns: null });
+  const [data, setData] = useState({taxStatus: null, taxComplianceStatus: null, invoices: [], taxReturns: null });
   const [loading, setLoading] = useState(false);
 
   const fetchFiscalData = async (link) => {
@@ -33,8 +41,10 @@ export default function Home(props) {
   }
 
   let {taxStatus, taxComplianceStatus, invoices, taxReturns } = data;
-  
-  console.log(data)
+
+  const payrollInvoices = invoices && invoices.filter(i => i.invoice_type == 'Nómina').sort((b,a) => new Date(b.invoice_date) - new Date(a.invoice_date))
+
+  const totalEarningsPerYear = taxReturns && taxReturns.filter(tr => tr.hasOwnProperty('sueldos_salarios')).map(tr => tr.informacion_general.ejercicio + tr.servicios_profesionales.ingresos.total_ingresos)
 
   return (
     <div className="container">
@@ -58,8 +68,135 @@ export default function Home(props) {
 
         { taxStatus && taxComplianceStatus && invoices && taxReturns && (
           <>
-            <p>You successfully loaded the app! Open the browser console and you will see all the data being retrieved from Belvo.</p>
-            <p>In the next step, you will see the Tax status data appear here :) </p>
+            <h2> Step #1 - Get to know the company </h2>
+            <h3> Taxpayer information</h3>
+            <ul>
+                <li>
+                  Name: {taxStatus.official_name}
+                </li>
+                <li>
+                  Location: {taxStatus.address.locality}, {taxStatus.address.state}
+                </li>
+                <li>
+                  Phone: {taxStatus.tax_payer_information.phone}
+                </li>
+                <li>
+                  Email: {taxStatus.tax_payer_information.email}
+                </li>
+                <li>
+                  Active taxpayer since: {taxStatus.tax_payer_information.start_operations_date.substring(0,10)}
+                </li>
+                <li>
+                  Economic activities: {taxStatus.economic_activity.map(a => a.economic_activity).join(', ')}
+                </li>
+            </ul>
+
+            <h3> Economic activites</h3>  
+              <PlotFigure 
+                className='plot' 
+                options={
+                  {
+                    marginLeft:150,
+                    marks: [
+                      Plot
+                       .barX(
+                         taxStatus.economic_activity
+                          .map(a => ({activity: a.economic_activity, value: a.percentage})), 
+                          {
+                            x: "value", 
+                            y: "activity",
+                            fill: "#4E79A7"
+                          })
+                    ],
+                    x: {
+                      label: "Percentage of income",
+                    },
+                    y: {
+                      label: "Business activity",
+                    },
+                    marginBottom: 40, 
+                  }
+                }
+              />
+
+            <h2>Step #2 - Indicators of fraud & non-compliance</h2>
+            <h3>Tax compliance status</h3>
+            <ul>
+              <li>
+                {getComplianceCheckResult(taxComplianceStatus.outcome)}
+              </li>
+            </ul>
+
+            <h2>Step #3 - Identify the risk profile of the client</h2>
+            <h3>Historical payroll invoices</h3>
+            <ul>
+              <li>
+                Average monthly paycheck: MXN {getAverage(payrollInvoices.map(i => i.total_amount))}
+              </li>
+              <li>
+                Number of employers during period: {getUniqueValues(payrollInvoices.map(i => i.sender_id)).length}
+              </li>
+            </ul>
+            <PlotFigure 
+              className='plot' 
+              options={
+                {
+                  marks: [
+                    Plot.barY(payrollInvoices, 
+                      Plot.groupX({y: "sum", }, { 
+                        x: d => new Date(d.invoice_date), 
+                        y: "total_amount", 
+                        thresholds: d3.timeMonth, 
+                        fill: "sender_id",
+                    })),
+                    Plot.frame(),
+                  ],
+                  x: { 
+                    tickRotate: -30, 
+                    tickFormat: d => Plot.formatMonth()(d.getMonth()) + " " + d.getFullYear(),
+                    label: "Month of the year",
+                  },
+                  y: {
+                    label: "Income",
+                  },
+                  grid: true,
+                  marginBottom: 75, 
+                  marginLeft: 100,
+                }
+              }
+            />
+            <h3>Yearly total earnings</h3>
+            <ul>
+              <li>
+                Average yearly total earnings: MXN {getAverage(totalEarningsPerYear)}
+              </li>
+            </ul>
+            <PlotFigure 
+              className='plot' 
+              options={
+                {
+                  marks: [
+                    Plot.barY(taxReturns, 
+                      Plot.groupX({y: "sum", }, { 
+                        x: d => d.informacion_general.ejercicio, 
+                        y: (d) => d.sueldos_salarios.ingreso_anual + d.servicios_profesionales.ingresos.total_ingresos, 
+                        fill: "#4E79A7"
+                    })),
+                    Plot.frame(),
+                  ],
+                  x: { 
+                    tickRotate: -30, 
+                    label: "Year"
+                  },
+                  y: {
+                    label: "Yearly income"
+                  },
+                  grid: true,
+                  marginBottom: 75, 
+                  marginLeft: 100,
+                }
+              }
+            />
           </>
         )}
       </main>
@@ -131,3 +268,4 @@ export default function Home(props) {
     </div>
   )
 }
+
