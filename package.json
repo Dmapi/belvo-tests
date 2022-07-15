@@ -1,0 +1,22 @@
+{
+  "name": "belvo-fiscal-guides",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@observablehq/plot": "^0.1.0",
+    "arquero": "^4.8.2",
+    "belvo": "^0.14.1",
+    "d3": "6",
+    "luxon": "^1.27.0",
+    "next": "10.2.3",
+    "node-fetch": "^2.6.1",
+    "plot-react": "^1.0.0",
+    "react": "17.0.2",
+    "react-dom": "17.0.2"
+  }
+}
